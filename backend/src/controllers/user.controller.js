@@ -1,10 +1,15 @@
 import userModel from "../models/user.model.js";
 import bcrypt from "bcrypt";
 import { generateToken } from "../utils/generateToken.js";
+import verifyEmail from "../../emailverify/verifyEmail.js";
+import jwt from "jsonwebtoken";
+import sessionModel from "../models/session.model.js";
+import { generateRefreshToken } from "../utils/generateRefreshToken.js";
+import sendOTPMail from "../../emailverify/sendOTPMail.js";
 
 const register = async (req, res) => {
   try {
-    const { firstName, lastName, email, password } = req.body;
+    const { firstName, lastName, email, password, role } = req.body;
     if (!firstName || !lastName || !email || !password) {
       return res
         .status(400)
@@ -25,13 +30,16 @@ const register = async (req, res) => {
       lastName,
       email,
       password: hashPassword,
+      role,
     });
 
+    const token = await generateToken(user);
+
+    // res.cookie("token", token);
+    verifyEmail(token, email);
+    user.token = token;
+
     const newUser = await user.save();
-
-    const token = generateToken(newUser);
-
-    res.cookie("token", token);
 
     return res.status(201).json({
       success: true,
@@ -53,4 +61,380 @@ const register = async (req, res) => {
   }
 };
 
-export { register };
+const verify = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(400).json({
+        success: false,
+        messaeg: "Authorization is missing or invalid ",
+      });
+    }
+
+    let decoded;
+    try {
+      const token = authHeader.split(" ")[1];
+
+      decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (error) {
+      if (error.name === "TokenExpiredError") {
+        return res.status(400).json({
+          success: false,
+          message: "the registration token has expired",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: "token verification failed",
+        error: error.message,
+      });
+    }
+    // set data in req.user
+    // req.user = decoded;
+
+    // verify user
+    const user = await userModel.findOne({ _id: decoded.userId });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, messsage: "user not found" });
+    }
+    user.token = null;
+    user.isVerified = true;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "email verify successfully" });
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "invalid token ",
+      error: error.message,
+    });
+  }
+};
+
+const reVerify = async (req, res) => {
+  console.log(req.body);
+  try {
+    const { email } = req.body;
+    if (!email || email === "undefined") {
+      return res
+        .status(400)
+        .json({ success: false, message: "email required" });
+    }
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "user not found" });
+    }
+    const token = generateToken(user);
+    verifyEmail(token, email);
+    user.token = token;
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: "verification email sent successfully",
+      token,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error ",
+      error: error.message,
+    });
+  }
+};
+
+// Login Controllers
+
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ success: false, message: "All fileds are reqiured" });
+    }
+    //check user avail in bd or not
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "invalid email or password" });
+    }
+    const isMatchPassword = await bcrypt.compare(password, user.password);
+    if (!isMatchPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "invalid email or password" });
+    }
+    if (user.isVerified === false) {
+      return res
+        .status(400)
+        .json({ success: false, message: "veify your account then login " });
+    }
+
+    //generate token access token aur refresh token
+    const accessToken = await generateToken(user);
+    const refreshToken = await generateRefreshToken(user);
+
+    user.isLoggedIn = true;
+    await user.save();
+
+    //check existing session an delete
+    const existingSession = await sessionModel.findOne({ userId: user._id });
+    if (existingSession) {
+      await sessionModel.findByIdAndDelete(existingSession._id);
+    }
+
+    //crete session
+    const sessionCreate = new sessionModel({
+      userId: user._id,
+      refreshToken: refreshToken,
+    });
+    // console.log("session", sessionCreate);
+    await sessionCreate.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `welcome back ${user.firstName}`,
+      user: user,
+      accessToken,
+      refreshToken,
+    });
+  } catch (error) {
+    console.log("login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error ",
+      error: error.message,
+    });
+  }
+};
+
+// logut user
+const logout = async (req, res) => {
+  try {
+    const id = req.user.userId;
+    await sessionModel.deleteMany({ userId: id });
+    await userModel.findByIdAndUpdate(id, { isLoggedIn: false });
+    return res
+      .status(200)
+      .json({ success: true, message: "user logged out successfully" });
+  } catch (error) {
+    console.log("login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error ",
+      error: error.message,
+    });
+  }
+};
+
+// forgotPassword
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+    const user = await userModel.findOne({ email });
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "user not found" });
+    }
+    const otp = Math.floor(Math.random() * 900000 + 100000).toString();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+    user.otp = otp;
+    user.otpExpiry = otpExpiry;
+    await user.save();
+    await sendOTPMail(otp, email);
+    return res
+      .status(200)
+      .json({ success: true, message: "Otp sent to email successfully" });
+  } catch (error) {
+    console.log("❌forgotPassword Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal sever error",
+      error: error.message,
+    });
+  }
+};
+const verifyOtp = async (req, res) => {
+  try {
+    const { otp } = req.body;
+    if (!otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "otp is required" });
+    }
+    const id = req.user.userId;
+    console.log(id);
+    const user = await userModel.findById(id);
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "user not found" });
+    }
+    if (!user.otp || !user.otpExpiry) {
+      return res.status(400).json({
+        success: false,
+        message: "Otp is not generated or already verify",
+      });
+    }
+    if (user.otpExpiry < new Date()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "otp has expired pls resend otp" });
+    }
+    if (user.otp !== otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Incorrect otp " });
+    }
+    user.otp = null;
+    user.otpExpiry = null;
+    await user.save();
+
+    return res
+      .status(200)
+      .json({ success: true, message: "opt verify successfully" });
+  } catch (error) {
+    console.log("verifyOtp Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal sever error",
+      error: error.message,
+    });
+  }
+};
+
+// Change Password
+const changePassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+    if (!newPassword || !confirmPassword) {
+      return res
+        .status(400)
+        .json({ success: false, message: "all fileds are required" });
+    }
+
+    const id = req.user.userId;
+
+    const user = await userModel.findById(id);
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "newPassword & confrimPasswors is not matched",
+      });
+    }
+    const newPasswordHashed = await bcrypt.hash(newPassword, 10);
+    user.password = newPasswordHashed;
+    await user.save();
+    return res
+      .status(200)
+      .json({ success: true, message: "password change successfully" });
+  } catch (error) {
+    console.log("chnagePassword Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal sever error",
+      error: error.message,
+    });
+  }
+};
+
+// find single user
+const getUserById = async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const user = await userModel
+      .findById(id)
+      .select("-password -token -otp -otpExpiry");
+    if (!user) {
+      return res
+        .status(400)
+        .json({ success: false, message: "user not found" });
+    }
+    return res
+      .status(200)
+      .json({ success: true, message: "User found successfully", user });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: "Intarnal server error",
+      error: error.message,
+    });
+  }
+};
+
+//  user update their details
+const updateUser = async (req, res) => {
+  try {
+    const { firstName, lastName, phoneNo, address, city, zipCode } = req.body;
+    const id = req.params.id;
+
+    // Ek update object banaya hu
+    const dataToUpdate = {
+      firstName,
+      lastName,
+      phoneNo,
+      address,
+      city,
+      zipCode,
+    };
+
+    const updatedUser = await userModel
+      .findByIdAndUpdate(id, dataToUpdate, { returnDocument: "after" })
+      .select("-password -token -otp -otpExpiry");
+    console.log("update", updatedUser);
+
+    if (!updatedUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "user not found" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "intarnal server error",
+      error: error.message,
+    });
+  }
+};
+
+export {
+  register,
+  verify,
+  reVerify,
+  login,
+  logout,
+  forgotPassword,
+  verifyOtp,
+  changePassword,
+  getUserById,
+  updateUser,
+};

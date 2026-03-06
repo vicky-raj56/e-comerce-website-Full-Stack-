@@ -33,12 +33,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["user", "admin"],
       default: "user",
+    
     },
     token: {
       type: String,
       default: null,
     },
-    isVeryfied: {
+    isVerified : {
       type: Boolean,
       default: false,
     },
