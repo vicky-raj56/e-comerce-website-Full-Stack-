@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  changePassword,
+  resetPassword,
   forgotPassword,
   getUserById,
   login,
@@ -20,10 +20,11 @@ router.post("/verify", verify);
 router.post("/reverify", reVerify);
 router.post("/login", login);
 
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-otp", verifyOtp);
+router.post("/reset-password", resetPassword);
+
 router.post("/logout", isAuthenticated, logout);
-router.post("/forgot-password", isAuthenticated, forgotPassword);
-router.post("/verify-otp", isAuthenticated, verifyOtp);
-router.post("/change-password", isAuthenticated, changePassword);
 router.put("/updateuser/:id", isAuthenticated, updateUser);
 router.get("/getuser/:id", isAuthenticated, getUserById);
 export default router;

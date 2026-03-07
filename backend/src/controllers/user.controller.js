@@ -67,7 +67,7 @@ const verify = async (req, res) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(400).json({
         success: false,
-        messaeg: "Authorization is missing or invalid ",
+        message: "Authorization is missing or invalid ",
       });
     }
 
@@ -97,7 +97,7 @@ const verify = async (req, res) => {
     if (!user) {
       return res
         .status(400)
-        .json({ success: false, messsage: "user not found" });
+        .json({ success: false, message: "user not found" });
     }
     user.token = null;
     user.isVerified = true;
@@ -130,7 +130,7 @@ const reVerify = async (req, res) => {
         .status(400)
         .json({ success: false, message: "user not found" });
     }
-    const token = generateToken(user);
+    const token = await generateToken(user);
     verifyEmail(token, email);
     user.token = token;
     await user.save();
@@ -215,7 +215,7 @@ const login = async (req, res) => {
   }
 };
 
-// logut user
+// logout user
 const logout = async (req, res) => {
   try {
     const id = req.user.userId;
@@ -255,9 +255,17 @@ const forgotPassword = async (req, res) => {
     user.otpExpiry = otpExpiry;
     await user.save();
     await sendOTPMail(otp, email);
-    return res
-      .status(200)
-      .json({ success: true, message: "Otp sent to email successfully" });
+
+    const resetToken = jwt.sign(
+      { userId: user._id },
+      process.env.RESET_PASSWORD_TOKEN,
+      { expiresIn: "15m" },
+    );
+    return res.status(200).json({
+      success: true,
+      message: "Otp sent to email successfully",
+      resetToken,
+    });
   } catch (error) {
     console.log("❌forgotPassword Error:", error);
 
@@ -271,19 +279,34 @@ const forgotPassword = async (req, res) => {
 const verifyOtp = async (req, res) => {
   try {
     const { otp } = req.body;
-    if (!otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "otp is required" });
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "missing token  please verify email  again",
+      });
     }
-    const id = req.user.userId;
-    console.log(id);
-    const user = await userModel.findById(id);
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.RESET_PASSWORD_TOKEN);
+    if (!decoded) {
+      return res.status(401).json({
+        success: false,
+        message: "invalid token pls email verify again",
+      });
+    }
+
+    const user = await userModel.findById(decoded.userId);
     if (!user) {
       return res
         .status(400)
         .json({ success: false, message: "user not found" });
     }
+    if (!otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "otp is required" });
+    }
+
     if (!user.otp || !user.otpExpiry) {
       return res.status(400).json({
         success: false,
@@ -296,9 +319,7 @@ const verifyOtp = async (req, res) => {
         .json({ success: false, message: "otp has expired pls resend otp" });
     }
     if (user.otp !== otp) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Incorrect otp " });
+      return res.status(400).json({ success: false, message: "Invalid otp " });
     }
     user.otp = null;
     user.otpExpiry = null;
@@ -309,6 +330,12 @@ const verifyOtp = async (req, res) => {
       .json({ success: true, message: "opt verify successfully" });
   } catch (error) {
     console.log("verifyOtp Error:", error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(400).json({
+        success: false,
+        message: " token has expired pls verify again",
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -318,19 +345,32 @@ const verifyOtp = async (req, res) => {
   }
 };
 
-// Change Password
-const changePassword = async (req, res) => {
+// resetPassword Password
+const resetPassword = async (req, res) => {
   try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "missing token  please verify email  again",
+      });
+    }
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.RESET_PASSWORD_TOKEN);
+    if (!decoded) {
+      return res.status(401).json({
+        success: false,
+        message: "invalid token pls email verify again",
+      });
+    }
     const { newPassword, confirmPassword } = req.body;
     if (!newPassword || !confirmPassword) {
       return res
         .status(400)
-        .json({ success: false, message: "all fileds are required" });
+        .json({ success: false, message: "all  fields are required" });
     }
 
-    const id = req.user.userId;
-
-    const user = await userModel.findById(id);
+    const user = await userModel.findById(decoded.userId);
     if (!user) {
       return res
         .status(400)
@@ -340,7 +380,7 @@ const changePassword = async (req, res) => {
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: "newPassword & confrimPasswors is not matched",
+        message: "Password is not matched",
       });
     }
     const newPasswordHashed = await bcrypt.hash(newPassword, 10);
@@ -350,7 +390,13 @@ const changePassword = async (req, res) => {
       .status(200)
       .json({ success: true, message: "password change successfully" });
   } catch (error) {
-    console.log("chnagePassword Error:", error);
+    console.log("changePassword Error:", error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(400).json({
+        success: false,
+        message: " token has expired pls verify again",
+      });
+    }
 
     return res.status(500).json({
       success: false,
@@ -434,7 +480,7 @@ export {
   logout,
   forgotPassword,
   verifyOtp,
-  changePassword,
+  resetPassword,
   getUserById,
   updateUser,
 };

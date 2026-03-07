@@ -22,7 +22,7 @@ async function sendOTPMail(otp, email) {
   transporter.sendMail(mailConfigurations, function (error, info) {
     if (error) throw Error(error);
     console.log("OTP Sent Successfully");
-    console.log(info);
+    // console.log(info);
   });
 }
 export default sendOTPMail;

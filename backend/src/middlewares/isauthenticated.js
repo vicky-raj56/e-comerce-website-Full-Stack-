@@ -7,7 +7,7 @@ export const isAuthenticated = async (req, res, next) => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
         success: false,
-        message: "auhtorizatio token is missing or invalid",
+        message: "authentication token is missing or invalid",
       });
     }
 
@@ -19,7 +19,7 @@ export const isAuthenticated = async (req, res, next) => {
       if (error.name === "TokenExpiredError") {
         return res
           .status(400)
-          .json({ sucess: false, message: "registration toeken has expired" });
+          .json({ success: false, message: "registration token has expired" });
       }
       return res.status(401).json({
         success: false,
@@ -33,7 +33,7 @@ export const isAuthenticated = async (req, res, next) => {
     req.user = decoded;
     next();
   } catch (error) {
-    console.log("auhtentication Error:", error);
+    console.log("authentication Error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",
