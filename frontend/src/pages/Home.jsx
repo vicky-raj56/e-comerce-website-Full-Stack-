@@ -1,11 +1,14 @@
+import Features from "@/components/Features";
+import Footer from "@/components/Footer";
+import Hero from "@/components/Hero";
 import React from "react";
 
 function Home() {
   return (
-    <div className="w-full min-h-screen bg-pink-200 ">
-      <div className=" h-screen w-full flex items-center justify-center">
-        <h1 className="text-3xl font-semibold ">Welcome to Our Website 🥰</h1>
-      </div>
+    <div>
+      <Hero />
+      <Features />
+      <Footer />
     </div>
   );
 }

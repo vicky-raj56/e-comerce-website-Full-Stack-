@@ -10,10 +10,13 @@ import ReVerify from "./pages/ReVerify";
 import ForgotPassword from "./pages/ForgotPassword";
 import VerifyOTP from "./pages/VerifyOTP";
 import ResetPassword from "./pages/ResetPassword";
+import Navbar from "./components/Navbar";
+import Profile from "./pages/Profile";
 
 export default function App() {
   return (
     <div>
+      <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
@@ -24,8 +27,12 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/profile/:id" element={<Profile />} />
       </Routes>
-      <ToastContainer />
+      <ToastContainer
+        position="top-center"  
+        autoClose={1000}
+      />
     </div>
   );
 }

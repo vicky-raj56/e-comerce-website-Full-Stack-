@@ -131,7 +131,7 @@ function Signup() {
                   </div>
                 </div>
                 <p>
-                  I have an account
+                  Already have an account
                   <Link
                     to={"/login"}
                     className=" ml-2 inline-block text-md underline-offset-4 hover:underline"

@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -12,13 +11,16 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import axios from "axios";
 import { toast } from "react-toastify";
+import { useDispatch } from "react-redux";
+import { setUser } from "../app/userSlice";
 function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const dispatch = useDispatch();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -39,9 +41,14 @@ function Login() {
       const response = await axios.post(`${backendUrl}/user/login`, {
         ...formData,
       });
-      toast.success(response.data.message);
+      toast.success(response.data.message, {
+        position: "top-center",
+        autoClose: 1000,
+      });
       console.log(response.data);
       if (response.data.success) {
+        dispatch(setUser(response.data.user));
+
         const accessToken = response.data.accessToken;
         const refreshToken = response.data.refreshToken;
 
@@ -56,8 +63,8 @@ function Login() {
         password: "",
       });
     } catch (error) {
-      toast.error(error.response.data.message || "something went wrong");
-      console.log("login error", error.response);
+      toast.error(error.response?.data?.message || "something went wrong");
+      console.log("login error", error);
     }
   }
 
