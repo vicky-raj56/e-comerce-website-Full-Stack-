@@ -1,19 +1,21 @@
 import { ShoppingCart } from "lucide-react";
-import React, { useState } from "react";
+import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { toast } from "react-toastify";
 import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
-import { logout, setUser } from "@/app/userSlice";
-
+import { logout } from "@/app/userSlice";
+logout;
 function Navbar() {
-  const userData = useSelector((state) => state.user.user);
+  const { userData, accessToken, isLoggedIn } = useSelector(
+    (state) => state.user,
+  );
+  const { cart } = useSelector((state) => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  const accessToken = localStorage.getItem("accessToken");
   async function handleLogout() {
     try {
       const response = await axios.post(
@@ -21,9 +23,7 @@ function Navbar() {
         {},
         {
           headers: {
-            Authorization: accessToken
-              ? `Bearer ${JSON.parse(accessToken)}`
-              : "",
+            Authorization: accessToken ? `Bearer ${accessToken}` : "",
           },
         },
       );
@@ -63,10 +63,10 @@ function Navbar() {
                 Products
               </li>
             </Link>
-            {userData && (
+            {isLoggedIn && (
               <Link to={`/profile/${userData._id}`}>
                 <li className="border-b-2  border-transparent  hover:border-black  transition-colors duration-300">
-                  Hello {userData?.firstName}
+                  Hello {userData.firstName}
                 </li>
               </Link>
             )}
@@ -74,11 +74,11 @@ function Navbar() {
           <Link to={"/cart"} className="relative ">
             <ShoppingCart />
             <span className="bg-pink-500 rounded-full absolute -top-3 -right-5 px-2 text-white font-bold">
-              {0}
+              {cart?.items?.length > 0 ? cart?.items?.length : 0}
             </span>
           </Link>
 
-          {userData ? (
+          {isLoggedIn ? (
             <Button
               className="bg-pink-600 text-white cursor-pointer hover:scale-103 transition-all duration-200 "
               onClick={handleLogout}

@@ -1,4 +1,4 @@
-import React, { use, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   Card,
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { ChessKing } from "lucide-react";
 function Profile() {
   const [formData, setFormData] = useState({
     firstName: "",
@@ -23,22 +25,25 @@ function Profile() {
     zipCode: "",
   });
   const [selectedFile, setSelectedFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState("/hero.logo.jpg");
+  const [previewUrl, setPreviewUrl] = useState("/user.png");
   const navigate = useNavigate();
   const { id } = useParams();
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
-  const accessToken = localStorage.getItem("accessToken");
+  const { accessToken } = useSelector((state) => state.user);
+
   const [buttonLoading, setButtonLoading] = useState(false);
   useEffect(() => {
     async function getProfileData() {
       try {
-        const response = await axios.get(`${backendUrl}/user/profile/${id}`, {
-          headers: {
-            Authorization: accessToken
-              ? `Bearer ${JSON.parse(accessToken)}`
-              : "",
+        const response = await axios.get(
+          `${backendUrl}/user/profile/${id}`,
+
+          {
+            headers: {
+              Authorization: accessToken ? `Bearer ${accessToken}` : "",
+            },
           },
-        });
+        );
         if (response.data.success) {
           const user = response.data.user;
           setFormData({
@@ -60,7 +65,7 @@ function Profile() {
       }
     }
     getProfileData();
-  }, []);
+  }, [id]);
 
   function handleInputChange(e) {
     const { name, value } = e.target;
@@ -69,6 +74,7 @@ function Profile() {
     });
   }
   const handleFileChange = (e) => {
+    console.dir(e.target);
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
@@ -80,7 +86,6 @@ function Profile() {
     e.preventDefault();
     try {
       setButtonLoading(true);
-
       const data = new FormData();
       data.append("firstName", formData.firstName);
       data.append("lastName", formData.lastName);
@@ -99,30 +104,27 @@ function Profile() {
         {
           headers: {
             "Content-Type": "multipart/form-data",
-            Authorization: accessToken
-              ? `Bearer ${JSON.parse(accessToken)}`
-              : "",
+            Authorization: accessToken ? `Bearer ${accessToken}` : "",
           },
         },
       );
 
       if (response.data.success) {
-        setButtonLoading(false)
+        setButtonLoading(false);
         toast.success(response.data.message);
-        setTimeout(() => {
-          // navigate(`/profile/${id}`);
-        }, 2000);
       }
     } catch (error) {
       setButtonLoading(false);
       console.log("updateProfile error:", error);
       toast.error(error?.response?.data.message || "something went wrong");
+    } finally {
+      setButtonLoading(false);
     }
   }
 
   return (
     <div className="min-h-[calc(100vh-87px)] bg-gray-100 ">
-      <div className="w-full md:max-w-7xl md:mx-auto  px-4 py-10 flex flex-col items-center">
+      <div className="w-full md:max-w-7xl md:mx-auto  px-4  flex flex-col items-center">
         <Tabs defaultValue="profile" className="">
           <TabsList className="mx-auto">
             <TabsTrigger value="profile">Profile</TabsTrigger>
@@ -131,7 +133,7 @@ function Profile() {
           <TabsContent value="profile">
             <div>
               <div className="flex flex-col items-center justify-center bg-gray-100">
-                <h1 className="font-bold text-2xl text-gray-800 mb-7">
+                <h1 className="font-bold text-2xl text-gray-800 mb-2">
                   Update Profile
                 </h1>
                 <div className="  flex flex-col gap-5  md:flex-row  md:gap-10 md:justify-center md:items-start  md:max-w-2xl">
@@ -158,7 +160,7 @@ function Profile() {
                   </div>
                   {/* profile form  */}
                   <form
-                    className="  space-y-4 p-5 shadow-lg rounded-lg bg-white "
+                    className="  space-y-4 p-3 shadow-lg rounded-lg bg-white "
                     onSubmit={handleSubmit}
                   >
                     <div className="grid  md:grid-cols-2 gap-4">
@@ -259,43 +261,45 @@ function Profile() {
                           focus:ring-2  focus:ring-gray-400 "
                       />
                     </div>
-                    <div className="flex flex-col gap-2 ">
-                      <label
-                        htmlFor="city"
-                        className="text-sm font-semibold ml-2"
-                      >
-                        City
-                      </label>
-                      <input
-                        type="text"
-                        id="city"
-                        name="city"
-                        value={formData.city}
-                        onChange={handleInputChange}
-                        placeholder="enter first name..."
-                        className="w-full px-3 py-1.5 rounded-lg border
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-2 ">
+                        <label
+                          htmlFor="city"
+                          className="text-sm font-semibold ml-2"
+                        >
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          id="city"
+                          name="city"
+                          value={formData.city}
+                          onChange={handleInputChange}
+                          placeholder="enter first name..."
+                          className="w-full px-3 py-1.5 rounded-lg border
                           focus:outline-none 
                           focus:ring-2  focus:ring-gray-400 "
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2 ">
-                      <label
-                        htmlFor="zipcode"
-                        className="text-sm font-semibold ml-2"
-                      >
-                        ZipCode
-                      </label>
-                      <input
-                        type="number"
-                        id="zipcode"
-                        name="zipCode"
-                        value={formData.zipCode}
-                        onChange={handleInputChange}
-                        placeholder="enter first name..."
-                        className="w-full px-3 py-1.5 rounded-lg border
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2 ">
+                        <label
+                          htmlFor="zipcode"
+                          className="text-sm font-semibold ml-2"
+                        >
+                          ZipCode
+                        </label>
+                        <input
+                          type="number"
+                          id="zipcode"
+                          name="zipCode"
+                          value={formData.zipCode}
+                          onChange={handleInputChange}
+                          placeholder="enter first name..."
+                          className="w-full px-3 py-1.5 rounded-lg border
                           focus:outline-none 
                           focus:ring-2  focus:ring-gray-400 "
-                      />
+                        />
+                      </div>
                     </div>
                     <div className="flex  justify-between  md:justify-end">
                       <Button

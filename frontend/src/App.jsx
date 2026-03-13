@@ -12,6 +12,8 @@ import VerifyOTP from "./pages/VerifyOTP";
 import ResetPassword from "./pages/ResetPassword";
 import Navbar from "./components/Navbar";
 import Profile from "./pages/Profile";
+import Products from "./pages/Products";
+import Cart from "./pages/Cart";
 
 export default function App() {
   return (
@@ -28,11 +30,10 @@ export default function App() {
         <Route path="/verify-otp" element={<VerifyOTP />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/profile/:id" element={<Profile />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/cart" element={<Cart />} />
       </Routes>
-      <ToastContainer
-        position="top-center"  
-        autoClose={1000}
-      />
+      <ToastContainer position="top-center" autoClose={1000} />
     </div>
   );
 }

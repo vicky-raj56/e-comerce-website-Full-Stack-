@@ -7,22 +7,23 @@ import { createSlice } from "@reduxjs/toolkit";
 const userSlice = createSlice({
   name: "user",
   initialState: {
-    user: localStorage.getItem("userInfo")
-      ? JSON.parse(localStorage.getItem("userInfo"))
-      : null,
+    userData: null,
+    accessToken: null,
+    refreshToken: null,
+    isLoggedIn: false,
   },
   reducers: {
     setUser: (state, action) => {
-      state.user = action.payload;
-      if (action.payload) {
-        localStorage.setItem("userInfo", JSON.stringify(action.payload));
-      }
+      state.userData = action.payload.user;
+      state.accessToken = action.payload.accessToken;
+      state.refreshToken = action.payload.refreshToken;
+      state.isLoggedIn = true;
     },
     logout: (state) => {
-      ((state.user = null),
-        localStorage.removeItem("userInfo"),
-        localStorage.removeItem("accessToken"),
-        localStorage.removeItem("refreshToken"));
+      state.userData = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.isLoggedIn = false;
     },
   },
 });

@@ -41,22 +41,18 @@ function Login() {
       const response = await axios.post(`${backendUrl}/user/login`, {
         ...formData,
       });
-      toast.success(response.data.message, {
-        position: "top-center",
-        autoClose: 1000,
-      });
-      console.log(response.data);
+      toast.success(response.data.message);
+      // console.log(response.data);
       if (response.data.success) {
-        dispatch(setUser(response.data.user));
-
-        const accessToken = response.data.accessToken;
-        const refreshToken = response.data.refreshToken;
-
-        localStorage.setItem("accessToken", JSON.stringify(accessToken));
-        localStorage.setItem("refreshToken", JSON.stringify(refreshToken));
+        dispatch(
+          setUser({
+            user: response.data.user,
+            accessToken: response.data.accessToken,
+            refreshToken: response.data.refreshToken,
+          }),
+        );
       }
 
-      console.log(response.data);
       navigate("/");
       setFormData({
         email: "",
