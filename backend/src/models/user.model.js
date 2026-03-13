@@ -4,20 +4,24 @@ const userSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
-      requried: true,
+      required: true,
+      trim: true,
     },
     lastName: {
       type: String,
       required: true,
+      trim: true,
     },
     email: {
       type: String,
       required: true,
+      trim: true,
     },
     password: {
       type: String,
       required: true,
-      minLength: [6, "password must be atleast ^ charechtor"],
+      minLength: [6, "password must be 6  character"],
+      trim: true,
     },
     profilePic: {
       //cloudinary for upload pic
@@ -33,13 +37,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       enum: ["user", "admin"],
       default: "user",
-    
     },
     token: {
       type: String,
       default: null,
     },
-    isVerified : {
+    isVerified: {
       type: Boolean,
       default: false,
     },
@@ -57,15 +60,19 @@ const userSchema = new mongoose.Schema(
     },
     address: {
       type: String,
+      trim: true,
     },
     city: {
       type: String,
+      trim: true,
     },
     zipCode: {
       type: String,
+      trim: true,
     },
     phoneNo: {
       type: String,
+      trim: true,
     },
   },
   {

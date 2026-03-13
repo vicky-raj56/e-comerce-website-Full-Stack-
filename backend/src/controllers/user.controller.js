@@ -6,6 +6,8 @@ import jwt from "jsonwebtoken";
 import sessionModel from "../models/session.model.js";
 import { generateRefreshToken } from "../utils/generateRefreshToken.js";
 import sendOTPMail from "../../emailverify/sendOTPMail.js";
+import { uploadImage } from "../configs/cloudinary.js";
+import { v2 as cloudinary } from "cloudinary";
 
 const register = async (req, res) => {
   try {
@@ -13,7 +15,7 @@ const register = async (req, res) => {
     if (!firstName || !lastName || !email || !password) {
       return res
         .status(400)
-        .json({ success: false, message: "all fileds are required" });
+        .json({ success: false, message: "all fields are required" });
     }
 
     const existingUser = await userModel.findOne({ email });
@@ -156,7 +158,7 @@ const login = async (req, res) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ success: false, message: "All fileds are reqiured" });
+        .json({ success: false, message: "All fields are required" });
     }
     //check user avail in bd or not
     const user = await userModel.findOne({ email });
@@ -174,7 +176,7 @@ const login = async (req, res) => {
     if (user.isVerified === false) {
       return res
         .status(400)
-        .json({ success: false, message: "veify your account then login " });
+        .json({ success: false, message: "verify your account then login " });
     }
 
     //generate token access token aur refresh token
@@ -201,7 +203,15 @@ const login = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: `welcome back ${user.firstName}`,
-      user: user,
+      user: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        address: user.address,
+        city: user.city,
+        zipCode: user.zipCode,
+        _id:user._id
+      },
       accessToken,
       refreshToken,
     });
@@ -425,7 +435,7 @@ const getUserById = async (req, res) => {
   } catch (error) {
     return res.status(400).json({
       success: false,
-      message: "Intarnal server error",
+      message: "Internal server error",
       error: error.message,
     });
   }
@@ -436,16 +446,35 @@ const updateUser = async (req, res) => {
   try {
     const { firstName, lastName, phoneNo, address, city, zipCode } = req.body;
     const id = req.params.id;
+    const imagePath = req.file?.path;
 
     // Ek update object banaya hu
     const dataToUpdate = {
-      firstName,
-      lastName,
-      phoneNo,
-      address,
-      city,
-      zipCode,
+      ...(firstName && { firstName: firstName }),
+      ...(lastName && { lastName }),
+      ...(phoneNo && { phoneNo }),
+      ...(address && { address }),
+      ...(city && { city }),
+      ...(zipCode && { zipCode }),
     };
+
+    const user = await userModel.findById(id);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    if (imagePath) {
+      if (user.profilePicId) {
+        await cloudinary.uploader.destroy(user.profilePicId);
+      }
+      const imageUrl = await uploadImage(imagePath);
+      const profilePic = imageUrl.secure_url;
+      const publicId = imageUrl.public_id;
+      dataToUpdate.profilePic = profilePic;
+      dataToUpdate.profilePicId = publicId;
+    }
 
     const updatedUser = await userModel
       .findByIdAndUpdate(id, dataToUpdate, { returnDocument: "after" })
@@ -464,9 +493,10 @@ const updateUser = async (req, res) => {
       user: updatedUser,
     });
   } catch (error) {
+    console.log(error);
     return res.status(500).json({
       success: false,
-      message: "intarnal server error",
+      message: "internal server error",
       error: error.message,
     });
   }

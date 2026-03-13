@@ -12,6 +12,7 @@ import {
   verifyOtp,
 } from "../controllers/user.controller.js";
 import { isAuthenticated } from "../middlewares/isauthenticated.js";
+import upload from "../middlewares/multer.js";
 
 const router = express.Router();
 
@@ -25,6 +26,11 @@ router.post("/verify-otp", verifyOtp);
 router.post("/reset-password", resetPassword);
 
 router.post("/logout", isAuthenticated, logout);
-router.put("/updateuser/:id", isAuthenticated, updateUser);
-router.get("/getuser/:id", isAuthenticated, getUserById);
+router.get("/profile/:id", isAuthenticated, getUserById);
+router.put(
+  "/profile/:id",
+  isAuthenticated,
+  upload.single("profilePic"),
+  updateUser,
+);
 export default router;
