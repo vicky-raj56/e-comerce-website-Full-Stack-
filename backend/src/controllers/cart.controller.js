@@ -166,7 +166,6 @@ import productModel from "../models/product.model.js";
 
 // export { getCart, addToCart, updateQuantity, removeToCart };
 
-
 const addToCart = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -221,7 +220,7 @@ const addToCart = async (req, res) => {
       cart: populatedData,
     });
   } catch (error) {
-    console.log("addToCart error:",error)
+    console.log("addToCart error:", error);
     return res
       .status(500)
       .json({ success: false, message: "internal server error" });
@@ -256,6 +255,7 @@ const updateCartQuantity = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { productId, action } = req.body;
+    // console.log("productId:",productId, "action",action)
 
     const cart = await cartModel.findOne({ userId });
     if (!cart) {
@@ -280,11 +280,12 @@ const updateCartQuantity = async (req, res) => {
       if (action === "decrement") {
         if (item.quantity > 1) {
           item.quantity -= 1;
-        } else {
-          cart.items = cart.items.filter(
-            (item) => item.productId.toString() !== productId,
-          );
         }
+        //  else {
+        //   cart.items = cart.items.filter(
+        //     (item) => item.productId.toString() !== productId,
+        //   );
+        // }
       }
     }
 
@@ -334,7 +335,13 @@ const removeToCart = async (req, res) => {
     await cart.save();
 
     const populateData = await cart.populate("items.productId");
-    return res.status(200).json({ success: true, cart: populateData });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Product removed successfully",
+        cart: populateData,
+      });
   } catch (error) {
     console.log("removeToCart error:", error);
     return res

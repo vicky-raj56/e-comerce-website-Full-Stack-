@@ -6,8 +6,14 @@ import productReducer from "./features/productSlice.js";
 import cartReducer from "./features/cartSlice.js";
 import storage from "redux-persist/lib/storage";
 
+const userPersistConfig = {
+  key: "user",
+  storage,
+  blacklist: ["accessToken"], //yah main user ke under ka accessToken blacklist kia
+};
+
 const rootReducer = combineReducers({
-  user: userReducer,
+  user: persistReducer(userPersistConfig, userReducer),
   products: productReducer,
   cart: cartReducer,
 });
@@ -15,7 +21,7 @@ const rootReducer = combineReducers({
 const persistConfig = {
   key: "root",
   storage,
-  blacklist: ["products"],
+  blacklist: ["products","user"],
 };
 
 const persisteReducer = persistReducer(persistConfig, rootReducer);

@@ -14,7 +14,7 @@ export const isAuthenticated = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+      decoded = jwt.verify(token, process.env.JWT_ACCESS_TOKEN);
     } catch (error) {
       if (error.name === "TokenExpiredError") {
         return res
@@ -28,7 +28,7 @@ export const isAuthenticated = async (req, res, next) => {
     }
     const user = await userModel.findById(decoded.userId);
     if (!user) {
-      return res.status(400).json({ success: false, message: "user not " });
+      return res.status(400).json({ success: false, message: "user not found " });
     }
     req.user = decoded;
     next();

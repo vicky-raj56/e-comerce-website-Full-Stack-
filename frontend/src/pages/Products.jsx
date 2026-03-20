@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import ProductCard from "@/components/ProductCard";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
 import { setProduct } from "@/app/features/productSlice";

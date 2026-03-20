@@ -10,6 +10,8 @@ import {
   updateUser,
   verify,
   verifyOtp,
+  refreshToken,
+  logoutAllDevice,
 } from "../controllers/user.controller.js";
 import { isAuthenticated } from "../middlewares/isauthenticated.js";
 import upload from "../middlewares/multer.js";
@@ -33,4 +35,6 @@ router.put(
   upload.single("profilePic"),
   updateUser,
 );
+router.post("/refresh-token", refreshToken);
+router.post("/logout-all-devices", isAuthenticated, logoutAllDevice);
 export default router;

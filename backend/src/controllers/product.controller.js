@@ -2,6 +2,19 @@ import { uploadMultipleImages } from "../configs/cloudinary.js";
 import productModel from "../models/product.model.js";
 import userModel from "../models/user.model.js";
 import { v2 as cloudinary } from "cloudinary";
+import { client } from "../redis/redisClient.js";
+// redis cache key for all products
+const cacheKey = "all-Products";
+
+// redis error handling
+const clearCache = async () => {
+  try {
+    await client.del(cacheKey);
+    console.log("Cache cleared successfully");
+  } catch (err) {
+    console.error("Redis Clear Error (Skipped):", err);
+  }
+};
 
 const addProduct = async (req, res) => {
   try {
@@ -56,6 +69,10 @@ const addProduct = async (req, res) => {
     });
 
     const savedProduct = await newProduct.save();
+
+    // Update the cache after adding a new product
+   await clearCache() ; // Clear the old cache
+
     res.status(201).json({
       success: true,
       message: "Product added successfully",
@@ -73,7 +90,17 @@ const addProduct = async (req, res) => {
 
 const getAllProducts = async (req, res) => {
   try {
+    const cachedProducts = await client.get(cacheKey);
+    if (cachedProducts) {
+      console.log("product fetched from cache");
+      return res.status(200).json({
+        success: true,
+        message: "all product fetched",
+        products: JSON.parse(cachedProducts),
+      });
+    }
     const products = await productModel.find({});
+
     if (!products) {
       return res.status(404).json({
         success: false,
@@ -81,6 +108,7 @@ const getAllProducts = async (req, res) => {
         products: [],
       });
     }
+    await client.set(cacheKey, JSON.stringify(products), { EX: 3600 });
     return res
       .status(200)
       .json({ success: true, message: "all product fetched", products });
@@ -98,7 +126,7 @@ const getAllProducts = async (req, res) => {
 
 const deleteProduct = async (req, res) => {
   try {
-    const {productId} = req.params;
+    const { productId } = req.params;
     const product = await productModel.findById(productId);
     if (!product) {
       return res
@@ -115,6 +143,8 @@ const deleteProduct = async (req, res) => {
 
     // product delete from db
     await productModel.findByIdAndDelete(productId);
+    // Update the cache after deleting the product
+    await clearCache() ; // Clear the old cache
 
     return res
       .status(200)
@@ -141,7 +171,7 @@ const updateProduct = async (req, res) => {
       brand,
       existingImages,
     } = req.body;
-    const {productId} = req.params;
+    const { productId } = req.params;
 
     const product = await productModel.findById(productId);
     if (!product) {
@@ -210,6 +240,8 @@ const updateProduct = async (req, res) => {
       updateData,
       { returnDocument: "after" },
     );
+    // Update the cache after updating the product
+    await clearCache() ; // Clear the old cache
 
     return res.status(200).json({
       success: true,

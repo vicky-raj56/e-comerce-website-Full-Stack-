@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import axios from "axios";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { useDispatch } from "react-redux";
 import { setUser } from "../app/userSlice";
 function Login() {
@@ -40,7 +41,7 @@ function Login() {
     try {
       const response = await axios.post(`${backendUrl}/user/login`, {
         ...formData,
-      });
+      },{withCredentials:true});
       toast.success(response.data.message);
       // console.log(response.data);
       if (response.data.success) {
@@ -48,7 +49,6 @@ function Login() {
           setUser({
             user: response.data.user,
             accessToken: response.data.accessToken,
-            refreshToken: response.data.refreshToken,
           }),
         );
       }

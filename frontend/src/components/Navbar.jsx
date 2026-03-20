@@ -2,11 +2,12 @@ import { ShoppingCart } from "lucide-react";
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
+import toast from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
 import axios from "axios";
 import { logout } from "@/app/userSlice";
-logout;
+
 function Navbar() {
   const { userData, accessToken, isLoggedIn } = useSelector(
     (state) => state.user,
@@ -14,8 +15,9 @@ function Navbar() {
   const { cart } = useSelector((state) => state.cart);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const admin = userData?.role === "admin" ? true : false;
+
   async function handleLogout() {
     try {
       const response = await axios.post(
@@ -25,6 +27,7 @@ function Navbar() {
           headers: {
             Authorization: accessToken ? `Bearer ${accessToken}` : "",
           },
+          withCredentials: true,
         },
       );
       if (response.data.success) {
@@ -67,6 +70,13 @@ function Navbar() {
               <Link to={`/profile/${userData._id}`}>
                 <li className="border-b-2  border-transparent  hover:border-black  transition-colors duration-300">
                   Hello {userData.firstName}
+                </li>
+              </Link>
+            )}
+            {admin && (
+              <Link to={`/dashboard`}>
+                <li className="border-b-2  border-transparent  hover:border-black  transition-colors duration-300">
+                  Dashboard
                 </li>
               </Link>
             )}

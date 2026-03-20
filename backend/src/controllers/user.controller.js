@@ -1,10 +1,12 @@
 import userModel from "../models/user.model.js";
 import bcrypt from "bcrypt";
-import { generateToken } from "../utils/generateToken.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+} from "../utils/generateToken.js";
 import verifyEmail from "../../emailverify/verifyEmail.js";
 import jwt from "jsonwebtoken";
 import sessionModel from "../models/session.model.js";
-import { generateRefreshToken } from "../utils/generateRefreshToken.js";
 import sendOTPMail from "../../emailverify/sendOTPMail.js";
 import { uploadImage } from "../configs/cloudinary.js";
 import { v2 as cloudinary } from "cloudinary";
@@ -35,7 +37,7 @@ const register = async (req, res) => {
       role,
     });
 
-    const token = await generateToken(user);
+    const token = await generateAccessToken(user);
 
     // res.cookie("token", token);
     verifyEmail(token, email);
@@ -132,7 +134,7 @@ const reVerify = async (req, res) => {
         .status(400)
         .json({ success: false, message: "user not found" });
     }
-    const token = await generateToken(user);
+    const token = await generateAccessToken(user);
     verifyEmail(token, email);
     user.token = token;
     await user.save();
@@ -180,25 +182,37 @@ const login = async (req, res) => {
     }
 
     //generate token access token aur refresh token
-    const accessToken = await generateToken(user);
-    const refreshToken = await generateRefreshToken(user);
+    const refreshToken = await generateRefreshToken(user._id);
+    const accessToken = await generateAccessToken(user);
 
     user.isLoggedIn = true;
     await user.save();
 
-    //check existing session an delete
-    const existingSession = await sessionModel.findOne({ userId: user._id });
-    if (existingSession) {
-      await sessionModel.findByIdAndDelete(existingSession._id);
+    //check existing session for same device then yes update otherwise create new session
+    const existingDeviceSession = await sessionModel.findOne({
+      userId: user._id,
+      userAgent: req.headers["user-agent"],
+    });
+    if (existingDeviceSession) {
+      existingDeviceSession.refreshToken = refreshToken;
+      existingDeviceSession.ip = req.ip;
+      await existingDeviceSession.save();
+    } else {
+      const sessionCreate = new sessionModel({
+        userId: user._id,
+        refreshToken: refreshToken,
+        ip: req.ip,
+        userAgent: req.headers["user-agent"] || "unknown",
+      });
+      await sessionCreate.save();
     }
 
-    //crete session
-    const sessionCreate = new sessionModel({
-      userId: user._id,
-      refreshToken: refreshToken,
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7days
     });
-    // console.log("session", sessionCreate);
-    await sessionCreate.save();
 
     return res.status(200).json({
       success: true,
@@ -210,10 +224,10 @@ const login = async (req, res) => {
         address: user.address,
         city: user.city,
         zipCode: user.zipCode,
-        _id:user._id
+        _id: user._id,
+        role: user.role,
       },
       accessToken,
-      refreshToken,
     });
   } catch (error) {
     console.log("login error:", error);
@@ -229,8 +243,12 @@ const login = async (req, res) => {
 const logout = async (req, res) => {
   try {
     const id = req.user.userId;
-    await sessionModel.deleteMany({ userId: id });
+    const refreshToken = req.cookies.refreshToken;
+    if (refreshToken) {
+      await sessionModel.findOneAndDelete({ refreshToken });
+    }
     await userModel.findByIdAndUpdate(id, { isLoggedIn: false });
+    res.clearCookie("refreshToken");
     return res
       .status(200)
       .json({ success: true, message: "user logged out successfully" });
@@ -502,6 +520,101 @@ const updateUser = async (req, res) => {
   }
 };
 
+const refreshToken = async (req, res) => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "refresh token is missing, please login again",
+      });
+    }
+    const session = await sessionModel.findOne({ refreshToken });
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        message: "invalid refresh token, please login again",
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN);
+    } catch (error) {
+      if (error.name === "TokenExpiredError") {
+        await sessionModel.findByIdAndDelete(session._id);
+        return res.status(401).json({
+          success: false,
+          message: "refresh token has expired, please login again",
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: "invalid refresh token, please login again",
+        error: error.message,
+      });
+    }
+    const user = await userModel.findById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "user not found, please login again",
+      });
+    }
+    const newAccessToken = await generateAccessToken(user);
+
+    const newRefreshToken = await generateRefreshToken(user._id);
+
+    session.refreshToken = newRefreshToken;
+    session.ip = req.ip;
+    session.userAgent = req.headers["user-agent"] || "unknown";
+    await session.save();
+    res.cookie("refreshToken", newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7days
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Access token refreshed successfully",
+      accessToken: newAccessToken,
+    });
+  } catch (error) {
+    console.log("refreshToken Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+const logoutAllDevice = async (req, res) => {
+  try {
+      const userId = req.user.userId;
+      await sessionModel.deleteMany({ userId });
+      await userModel.findByIdAndUpdate(userId, { isLoggedIn: false });
+      res.clearCookie("refreshToken");
+      return res.status(200).json({
+        success: true,
+        message: "Logged out from all devices successfully",
+      });
+
+    
+  } catch (error) {
+    console.log("logoutAllDevice Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+
+    
+  }
+};
+
 export {
   register,
   verify,
@@ -513,4 +626,6 @@ export {
   resetPassword,
   getUserById,
   updateUser,
+  refreshToken,
+  logoutAllDevice
 };

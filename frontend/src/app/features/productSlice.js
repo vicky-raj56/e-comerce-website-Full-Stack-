@@ -9,6 +9,7 @@ const productSlice = createSlice({
     setProduct: (state, action) => {
       state.products = action.payload;
     },
+    
     setCart: (state, action) => {
       console.log("slice", action.payload);
       if (action.payload) {

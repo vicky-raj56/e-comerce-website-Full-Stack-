@@ -3,8 +3,10 @@ import { Button } from "./ui/button";
 import { ShoppingCart } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { addToCart, removeToCart } from "@/app/features/cartSlice";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify";
 import axios from "axios";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 function ProductCard({ product }) {
   const {
@@ -17,9 +19,11 @@ function ProductCard({ product }) {
     brand,
   } = product;
   const dispatch = useDispatch();
-  const { items } = useSelector((state) => state.cart);
+  // const { items } = useSelector((state) => state.cart);
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const { accessToken } = useSelector((state) => state.user);
+  const navigate = useNavigate();
+
   async function addedToCart(productId) {
     try {
       const response = await axios.post(
@@ -46,7 +50,10 @@ function ProductCard({ product }) {
   return (
     <div className="shadow-lg rounded-lg overflow-hidden bg-white border">
       {/* image */}
-      <div className="w-full aspect-square overflow-hidden bg-gray-50">
+      <div
+        className="w-full aspect-square overflow-hidden bg-gray-50"
+        onClick={() => navigate(`/products/${product._id}`)}
+      >
         <img
           src={productImage[0].url}
           alt={productName}
@@ -79,15 +86,14 @@ function ProductCard({ product }) {
           </Button>
         )} */}
 
-
         <Button
-            className="cursor-pointer bg-pink-600 hover:bg-pink-700 w-full my-2  "
-            onClick={() => {
-              addedToCart(_id);
-            }}
-          >
-            <ShoppingCart className="mr-1 h-4 w-4" /> Add to Cart
-          </Button>
+          className="cursor-pointer bg-pink-600 hover:bg-pink-700 w-full my-2  "
+          onClick={() => {
+            addedToCart(_id);
+          }}
+        >
+          <ShoppingCart className="mr-1 h-4 w-4" /> Add to Cart
+        </Button>
       </div>
     </div>
   );
