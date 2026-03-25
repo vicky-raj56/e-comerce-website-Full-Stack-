@@ -12,9 +12,11 @@ import {
   verifyOtp,
   refreshToken,
   logoutAllDevice,
+  getAllUser,
 } from "../controllers/user.controller.js";
 import { isAuthenticated } from "../middlewares/isauthenticated.js";
 import upload from "../middlewares/multer.js";
+import { isAdmin } from "./../middlewares/isAdmin.js";
 
 const router = express.Router();
 
@@ -35,6 +37,7 @@ router.put(
   upload.single("profilePic"),
   updateUser,
 );
+router.get("/get-all", isAuthenticated, isAdmin, getAllUser);
 router.post("/refresh-token", refreshToken);
 router.post("/logout-all-devices", isAuthenticated, logoutAllDevice);
 export default router;

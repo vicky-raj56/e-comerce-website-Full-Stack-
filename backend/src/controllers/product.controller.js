@@ -71,7 +71,7 @@ const addProduct = async (req, res) => {
     const savedProduct = await newProduct.save();
 
     // Update the cache after adding a new product
-   await clearCache() ; // Clear the old cache
+    await clearCache(); // Clear the old cache
 
     res.status(201).json({
       success: true,
@@ -144,7 +144,7 @@ const deleteProduct = async (req, res) => {
     // product delete from db
     await productModel.findByIdAndDelete(productId);
     // Update the cache after deleting the product
-    await clearCache() ; // Clear the old cache
+    await clearCache(); // Clear the old cache
 
     return res
       .status(200)
@@ -161,6 +161,104 @@ const deleteProduct = async (req, res) => {
 
 // update product
 
+// const updateProduct = async (req, res) => {
+//   try {
+//     const {
+//       productName,
+//       productDescription,
+//       productPrice,
+//       category,
+//       brand,
+//       existingImages,
+//     } = req.body;
+//     const { productId } = req.params;
+//     // console.log(existingImages)
+
+//     const product = await productModel.findById(productId);
+//     if (!product) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "product not found" });
+//     }
+
+//     // 1. Existing images handle (Frontend se bachi hui images)
+//     let parsedExisting = [];
+//     if (existingImages) {
+//       parsedExisting =
+//         typeof existingImages === "string"
+//           ? JSON.parse(existingImages)
+//           : existingImages;
+//     }
+
+//     // 2. Jo images hatayi gayi hain unhe Cloudinary se delete
+//     const deleteImages = product.productImage.filter((oldImage) => {
+//       const match = parsedExisting.find(
+//         (newImage) => newImage.publicId === oldImage.publicId,
+//       );
+//       return !match;
+//     });
+
+//     for (const img of deleteImages) {
+//       await cloudinary.uploader.destroy(img.publicId);
+//     }
+
+//     // 3. Nayi images upload karo (sirf tabhi jab bheji gayi hon)
+//     let uploadedImages = [];
+//     if (req.files && req.files.length > 0) {
+//       uploadedImages = await uploadMultipleImages(req.files);
+
+//       // Agar upload fail ho jaye toh error return karein
+//       if (!uploadedImages || uploadedImages.length === 0) {
+//         return res
+//           .status(500)
+//           .json({ success: false, message: "Cloudinary upload failed" });
+//       }
+//     }
+
+//     // 4. Sab merge karke final array
+//     let finalImages = [...parsedExisting, ...uploadedImages];
+
+//     //  Agar galti se saari images delete ho gayi hain
+//     if (finalImages.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "At least one product image is required",
+//       });
+//     }
+
+//     // 5. Update Data Object
+//     const updateData = {
+//       productName: productName || product.productName,
+//       productDescription: productDescription || product.productDescription,
+//       productPrice: Number(productPrice) || product.productPrice,
+//       category: category || product.category,
+//       brand: brand || product.brand,
+//       productImage: finalImages,
+//     };
+
+//     const updatedProduct = await productModel.findByIdAndUpdate(
+//       productId,
+//       updateData,
+//       { returnDocument: "after" },
+//     );
+//     // Update the cache after updating the product
+//     await clearCache(); // Clear the old cache
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "product updated successfully",
+//       product: updatedProduct,
+//     });
+//   } catch (error) {
+//     console.log("updateProduct Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error",
+//       error: error.message,
+//     });
+//   }
+// };
+
 const updateProduct = async (req, res) => {
   try {
     const {
@@ -169,7 +267,7 @@ const updateProduct = async (req, res) => {
       productPrice,
       category,
       brand,
-      existingImages,
+      existingImages, // Ye stringified array of publicIds hai
     } = req.body;
     const { productId } = req.params;
 
@@ -180,44 +278,46 @@ const updateProduct = async (req, res) => {
         .json({ success: false, message: "product not found" });
     }
 
-    // 1. Existing images handle (Frontend se bachi hui images)
-    let parsedExisting = [];
+    // 1. Existing images handle (Parse safety)
+    let publicIdsKeep = [];
     if (existingImages) {
-      parsedExisting =
-        typeof existingImages === "string"
-          ? JSON.parse(existingImages)
-          : existingImages;
-    }
-
-    // 2. Jo images hatayi gayi hain unhe Cloudinary se delete
-    const deleteImages = product.productImage.filter((oldImage) => {
-      const match = parsedExisting.find(
-        (newImage) => newImage.publicId === oldImage.publicId,
-      );
-      return !match;
-    });
-
-    for (const img of deleteImages) {
-      await cloudinary.uploader.destroy(img.publicId);
-    }
-
-    // 3. Nayi images upload karo (sirf tabhi jab bheji gayi hon)
-    let uploadedImages = [];
-    if (req.files && req.files.length > 0) {
-      uploadedImages = await uploadMultipleImages(req.files);
-
-      // Agar upload fail ho jaye toh error return karein
-      if (!uploadedImages || uploadedImages.length === 0) {
-        return res
-          .status(500)
-          .json({ success: false, message: "Cloudinary upload failed" });
+      try {
+        publicIdsKeep =
+          typeof existingImages === "string"
+            ? JSON.parse(existingImages)
+            : existingImages;
+      } catch (e) {
+        console.log("JSON Parse Error:", e);
+        publicIdsKeep = [];
       }
     }
 
-    // 4. Sab merge karke final array
-    let finalImages = [...parsedExisting, ...uploadedImages];
+    // 2. Cloudinary se delete karo jo remove ho gayi hain
+    // Hum product.productImage (DB wale objects) ko check karenge
+    const imagesToDelete = product.productImage.filter(
+      (oldImg) => !publicIdsKeep.includes(oldImg.publicId),
+    );
 
-    //  Agar galti se saari images delete ho gayi hain
+    for (const img of imagesToDelete) {
+      if (img.publicId) {
+        await cloudinary.uploader.destroy(img.publicId);
+      }
+    }
+
+    // 3. Database ke liye wo objects rakho jo delete nahi hue
+    const keptImages = product.productImage.filter((oldImg) =>
+      publicIdsKeep.includes(oldImg.publicId),
+    );
+
+    // 4. Nayi images upload karo
+    let newlyUploaded = [];
+    if (req.files && req.files.length > 0) {
+      newlyUploaded = await uploadMultipleImages(req.files);
+    }
+
+    // 5. Final Merge (Purane Objects + Naye Objects)
+    const finalImages = [...keptImages, ...newlyUploaded];
+
     if (finalImages.length === 0) {
       return res.status(400).json({
         success: false,
@@ -225,7 +325,7 @@ const updateProduct = async (req, res) => {
       });
     }
 
-    // 5. Update Data Object
+    // 6. Update Data
     const updateData = {
       productName: productName || product.productName,
       productDescription: productDescription || product.productDescription,
@@ -238,10 +338,11 @@ const updateProduct = async (req, res) => {
     const updatedProduct = await productModel.findByIdAndUpdate(
       productId,
       updateData,
-      { returnDocument: "after" },
+      { new: true }, // Mongoose mein 'new: true' use hota hai updated doc ke liye
     );
-    // Update the cache after updating the product
-    await clearCache() ; // Clear the old cache
+
+    // Cache clearing logic
+    if (typeof clearCache === "function") await clearCache();
 
     return res.status(200).json({
       success: true,
@@ -249,7 +350,7 @@ const updateProduct = async (req, res) => {
       product: updatedProduct,
     });
   } catch (error) {
-    console.log("updateProduct Error:", error);
+    console.error("updateProduct Error:", error);
     return res.status(500).json({
       success: false,
       message: "Internal server error",

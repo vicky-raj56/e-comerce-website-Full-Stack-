@@ -462,7 +462,8 @@ const getUserById = async (req, res) => {
 //  user update their details
 const updateUser = async (req, res) => {
   try {
-    const { firstName, lastName, phoneNo, address, city, zipCode } = req.body;
+    const { firstName, lastName, phoneNo, address, city, zipCode, role } =
+      req.body;
     const id = req.params.id;
     const imagePath = req.file?.path;
 
@@ -474,6 +475,7 @@ const updateUser = async (req, res) => {
       ...(address && { address }),
       ...(city && { city }),
       ...(zipCode && { zipCode }),
+      ...(role && { role }),
     };
 
     const user = await userModel.findById(id);
@@ -593,16 +595,14 @@ const refreshToken = async (req, res) => {
 
 const logoutAllDevice = async (req, res) => {
   try {
-      const userId = req.user.userId;
-      await sessionModel.deleteMany({ userId });
-      await userModel.findByIdAndUpdate(userId, { isLoggedIn: false });
-      res.clearCookie("refreshToken");
-      return res.status(200).json({
-        success: true,
-        message: "Logged out from all devices successfully",
-      });
-
-    
+    const userId = req.user.userId;
+    await sessionModel.deleteMany({ userId });
+    await userModel.findByIdAndUpdate(userId, { isLoggedIn: false });
+    res.clearCookie("refreshToken");
+    return res.status(200).json({
+      success: true,
+      message: "Logged out from all devices successfully",
+    });
   } catch (error) {
     console.log("logoutAllDevice Error:", error);
     return res.status(500).json({
@@ -610,8 +610,27 @@ const logoutAllDevice = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
 
-    
+const getAllUser = async (req, res) => {
+  try {
+    const allUser = await userModel.find({});
+    if (!allUser) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found " });
+    }
+    return res.status(200).json({
+      success: true,
+      message: "user fetched successfully",
+      users: allUser,
+    });
+  } catch (error) {
+    console.log("getAllUser Error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error", error: error });
   }
 };
 
@@ -627,5 +646,6 @@ export {
   getUserById,
   updateUser,
   refreshToken,
-  logoutAllDevice
+  logoutAllDevice,
+  getAllUser,
 };
